@@ -4,7 +4,8 @@ module Data.Trie.Pseudo where
 
 import Data.Trie.Pseudo.Internal
 
-import Prelude hiding (lookup)
+import Prelude hiding (lookup, map)
+import Control.Applicative
 import Data.List.NonEmpty
 import Data.Default
 import Data.Monoid
@@ -31,24 +32,5 @@ lookup tss@(t:|ts) (More (p,mx) xs) | t == p =
     hasNextTag t Nil = False
     hasNextTag t (More (p,_) _) = t == p
     hasNextTag t (Rest (p:|_) _) = t == p
-
--- instance (Eq t) => Applicative (PseudoTrie t) where
---   -- noop
---   Nil <*> xss@(More (p, mx) xs) = xss
---   Nil <*> xss@(Rest ps a) = xss
---   -- info loss
---   (More (t,mf) fs) <*> Nil = Nil
---   (Rest ts f) <*> Nil = Nil
---   -- computation
---   (More (t,mf) fs) <*> (More (p,mx) xs)
---     | t == p = More (p, mf <*> mx) $ fs <*> xs
---     | otherwise = More (p,mx) xs -- derailed
---   (Rest ts f) <*> (Rest ps x)
---     | ts == ps = Rest ps $ f x
---     | otherwise = Rest ps x
---   (More (t,mf) fs) <*> (Rest pss@(p:|ps) x)
---     | t == p = Rest pss $
---   (Rest ts f) <*> (More (p,mx) xs) =
-
 
 -- instance Default t =>
