@@ -18,6 +18,10 @@ data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Nil
   deriving (Show, Eq, Functor)
 
+instance (Eq t, Default t) => Monoid (PseudoTrie t a) where
+  mempty = Nil
+  x `mappend` y = x `union` y
+
 lookup :: (Eq t) => NonEmpty t -> PseudoTrie t a -> Maybe a
 lookup _ Nil = Nothing
 lookup tss (Rest pss a) | tss == pss = Just a
@@ -47,12 +51,12 @@ union (Rest tss@(t:|ts) x) (Rest pss@(p:|ps) y)
                           Rest (fromList ts) x `union` Rest (fromList ps) y :| []
   -- root normalization
   | t == def = case ts of
-                [] -> More (def,Just x) [Rest
+                [] -> More (def,Just x) $ fromList [Rest
                         (if p == def then fromList ps else pss)
                         y]
                 _  -> Rest (fromList ts) x `union` Rest pss y
   | p == def = case ps of
-                [] -> More (def,Just y) [Rest
+                [] -> More (def,Just y) $ fromList [Rest
                         (if t == def then fromList ts else tss)
                         y]
                 _  -> Rest tss x `union` Rest (fromList ps) y
