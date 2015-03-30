@@ -41,50 +41,50 @@ union Nil y = y
 union (Rest tss@(t:|ts) x) (Rest pss@(p:|ps) y)
   | tss == pss = Rest pss y
   | t == p = case (ts,ps) of
-               ([],(p':ps')) -> More (t,Just x) $ Rest (fromList ps) y :| []
-               ((t':ts'),[]) -> More (p,Just y) $ Rest (fromList ts) x :| []
+               ([],p':ps') -> More (t,Just x) $ Rest (fromList ps) y :| []
+               (t':ts',[]) -> More (p,Just y) $ Rest (fromList ts) x :| []
                (_,_) -> More (t,Nothing) $
-                          (Rest (fromList ts) x) `union` (Rest (fromList ps) y) :| []
+                          Rest (fromList ts) x `union` Rest (fromList ps) y :| []
   -- root normalization
   | t == def = case ts of
-                [] -> More (def,Just x) $ Rest
-                        (if p == def then (fromList ps) else pss)
-                        y :| []
-                _  -> (Rest (fromList ts) x) `union` (Rest pss y)
+                [] -> More (def,Just x) [Rest
+                        (if p == def then fromList ps else pss)
+                        y]
+                _  -> Rest (fromList ts) x `union` Rest pss y
   | p == def = case ps of
-                [] -> More (def,Just y) $ Rest
-                        (if t == def then (fromList ts) else tss)
-                        y :| []
-                _  -> (Rest tss x) `union` (Rest (fromList ps) y)
+                [] -> More (def,Just y) [Rest
+                        (if t == def then fromList ts else tss)
+                        y]
+                _  -> Rest tss x `union` Rest (fromList ps) y
   | otherwise = Rest pss y
 union (More (t,mx) xs) (More (p,my) ys)
-  | t == p = let zs = (toList xs) ++ (toList ys) in
+  | t == p = let zs = toList xs ++ toList ys in
              More (p,my) $ fromList $
               foldl (\(z':zs') q -> z' `union` q : zs') [head zs] (tail zs)
   | t == def = More (def,mx) $
-                 fmap (`union` (More (p,my) ys)) xs
+                 fmap (`union` More (p,my) ys) xs
   | p == def = More (def,my) $
-                 fmap (`union` (More (t,mx) xs)) ys
+                 fmap (`union` More (t,mx) xs) ys
   -- disjoint
   | otherwise = More (def,Nothing) $
-                  (More (t,mx) xs) :| (More (p,my) ys) : []
+                  More (t,mx) xs :| [More (p,my) ys]
 union (More (t,mx) xs) (Rest pss@(p:|ps) y)
   | t == p = case ps of
                [] -> More (p,Just y) xs
                _  -> More (t,mx) $ fmap (`union` Rest (fromList ps) y) xs
   | t == def = More (def,mx) $ fmap (`union` Rest pss y) xs
-  | p == def = (More (t,mx) xs) `union` (Rest (fromList ps) y)
+  | p == def = More (t,mx) xs `union` Rest (fromList ps) y
   -- disjoint
   | otherwise = More (def,Nothing) $
-                  (More (t,mx) xs) :| Rest pss y : []
+                  More (t,mx) xs :| [Rest pss y]
 union (Rest tss@(t:|ts) x) (More (p,my) ys)
   | t == p = case ts of
                [] -> More (t,Just x) ys
                _  -> More (p,my) $ fmap (Rest (fromList ts) x `union`) ys
-  | t == def = (Rest (fromList ts) x) `union` (More (p,my) ys)
+  | t == def = Rest (fromList ts) x `union` More (p,my) ys
   | p == def = More (def,my) $ fmap (Rest tss x `union`) ys
   -- disjoint
   | otherwise = More (def,Nothing) $
-                  Rest tss x :| (More (p,my) ys) : []
+                  Rest tss x :| [More (p,my) ys]
 
 -- instance Default t =>
