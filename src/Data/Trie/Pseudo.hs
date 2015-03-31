@@ -4,19 +4,40 @@ module Data.Trie.Pseudo where
 
 import Data.Trie.Pseudo.Internal
 
-import Prelude hiding (lookup, map)
+import Prelude hiding (lookup, map, foldr, foldl)
 import Control.Applicative
-import Data.List.NonEmpty hiding (head, tail)
+import Data.List.NonEmpty (NonEmpty (..), fromList, toList)
+import qualified Data.List.NonEmpty as NE
 import Data.Default
 import Data.Monoid
-import Data.Foldable (find)
+import Data.Foldable
 import Data.Maybe (fromMaybe)
+
+-- TODO: normalize, pointWise, difference
+-- normalize:
+--   - remove needless roots
+--   - remove needless Nils
 
 -- | Non-Empty Rose Tree with explicit emptyness
 data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Rest (NonEmpty t) a
                     | Nil
   deriving (Show, Eq, Functor)
+
+instance Foldable (PseudoTrie t) where
+  foldr _ acc Nil = acc
+  foldr f acc (Rest _ x) = f x acc
+  foldr f acc (More (t, Nothing) xs) = foldr go acc xs
+    where
+      go x bcc = foldr f bcc x
+  foldr f acc (More (t, Just x) xs) = foldr go (f x acc) xs
+    where
+      go x bcc = foldr f bcc x
+
+-- toAssocs :: PseudoTrie t a -> [(NonEmpty t, a)]
+-- toAssocs Nil = []
+-- toAssocs (Rest ts x) = [(ts, x)]
+-- toAssocs (More (t, mx) xs) =
 
 instance (Eq t, Default t) => Monoid (PseudoTrie t a) where
   mempty = Nil
@@ -62,7 +83,7 @@ union (Rest tss@(t:|ts) x) (Rest pss@(p:|ps) y)
                 _  -> Rest tss x `union` Rest (fromList ps) y
   | otherwise = Rest pss y
 union (More (t,mx) xs) (More (p,my) ys)
-  | t == p = let zs = toList xs ++ toList ys in
+  | t == p = let zs = NE.toList xs ++ NE.toList ys in
              More (p,my) $ fromList $
               foldl (\(z':zs') q -> z' `union` q : zs') [head zs] (tail zs)
   | t == def = More (def,mx) $
