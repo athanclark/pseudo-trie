@@ -48,7 +48,7 @@ toAssocs = go (def :| []) []
       foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs
     go depth acc (More (t, Just x) xs) =
       (depth S.<> (t :| []), x) :
-        foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs
+        (foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs)
 
 fromAssocs :: (Eq t, Default t) => [(NonEmpty t, a)] -> PseudoTrie t a
 fromAssocs = foldr (uncurry add) Nil
