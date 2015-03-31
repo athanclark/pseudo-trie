@@ -12,7 +12,7 @@ import qualified Data.List.NonEmpty        as NE
 import           Data.Maybe                (fromMaybe)
 import           Data.Monoid
 import qualified Data.Semigroup            as S
-import           Prelude                   hiding (foldl, foldr, lookup, map)
+import           Prelude                   hiding (foldl, foldr, foldr1, lookup, map)
 
 -- TODO: normalize, difference
 -- normalize:
@@ -25,15 +25,16 @@ data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Nil
   deriving (Show, Eq, Functor)
 
+-- | Depth first
 instance Foldable (PseudoTrie t) where
   foldr _ acc Nil = acc
   foldr f acc (Rest _ x) = f x acc
   foldr f acc (More (t, Nothing) xs) = foldr go acc xs
     where
-      go x bcc = foldr f bcc x
+      go z bcc = foldr f bcc z
   foldr f acc (More (t, Just x) xs) = foldr go (f x acc) xs
     where
-      go x bcc = foldr f bcc x
+      go z bcc = foldr f bcc z
 
 toAssocs :: (Default t) => PseudoTrie t a -> [(NonEmpty t, a)]
 toAssocs = go (def :| []) []
@@ -48,7 +49,7 @@ toAssocs = go (def :| []) []
         (foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs)
 
 fromAssocs :: (Eq t, Default t) => [(NonEmpty t, a)] -> PseudoTrie t a
-fromAssocs = foldr (uncurry add) Nil
+fromAssocs = foldr (uncurry set) Nil
 
 instance (Eq t, Default t, Monoid a) => Monoid (PseudoTrie t a) where
   mempty = Nil
@@ -69,8 +70,8 @@ lookup tss@(t:|ts) (More (p,mx) xs) | t == p =
     hasNextTag t (More (p,_) _) = t == p
     hasNextTag t (Rest (p:|_) _) = t == p
 
-add :: (Eq t, Default t) => NonEmpty t -> a -> PseudoTrie t a -> PseudoTrie t a
-add ts = unionWith const . Rest ts
+set :: (Eq t, Default t) => NonEmpty t -> a -> PseudoTrie t a -> PseudoTrie t a
+set ts = unionWith const . Rest ts
 
 unionWith :: (Eq t, Default t) =>
              (a -> a -> a)
@@ -166,4 +167,28 @@ intersectionWith f (Rest tss@(t:|ts) x) (More (p,my) ys)
 --            -> PseudoTrie t a
 --            -> PseudoTrie t a
 
--- instance Default t =>
+-- | @More (Nil)@ -> singleton @Rest@, children with Nil are removed,
+-- @More Nothing (More Nothing ... More x (Nil))@ are reduced.
+prune :: (Eq t, Default t) => PseudoTrie t a -> PseudoTrie t a
+prune = go Nothing
+  where
+    go :: (Eq t, Default t) => Maybe (NonEmpty t) -> PseudoTrie t a -> PseudoTrie t a
+    go Nothing Nil = Nil
+    go Nothing   (More (t,Nothing) xs) = foldr1 (unionWith (const id)) $
+      fmap (go (Just $ NE.fromList [t])) $ removeNils $ NE.toList xs
+    go (Just ts) (More (t,Nothing) xs) = foldr1 (unionWith (const id)) $
+      fmap (go (Just $ NE.fromList $ (NE.toList ts) ++ [t])) $ removeNils $ NE.toList xs
+    -- lookahead
+    go (Just ts) (More (t,Just c) (Nil :| [])) =
+      Rest (NE.fromList $ (NE.toList ts) ++ [t]) c
+    go _         (More (t,Just c) xs) =
+      More (t,Just c) $ NE.fromList $
+        fmap (go Nothing) $ removeNils $ NE.toList xs
+    go (Just ts) (Rest ps x) =
+      Rest (NE.fromList $ NE.toList ts ++ NE.toList ps) x
+    go Nothing x@(Rest _  _) = x
+
+    removeNils :: [PseudoTrie t a] -> [PseudoTrie t a]
+    removeNils [] = []
+    removeNils (Nil:xs) = removeNils xs
+    removeNils (x:xs) = x : removeNils xs
