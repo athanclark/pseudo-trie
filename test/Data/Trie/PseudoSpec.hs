@@ -9,6 +9,13 @@ import Test.QuickCheck.Instances
 main :: IO ()
 main = hspec spec
 
+-- TODO:
+--   - Overwriting
+--   - Forking two Rests at their divergent point
+--   - fromAssocs . toAssocs == normalize
+--   - making a new root node...?
+--      - implicit optional root node :\ bad idea
+
 spec :: Spec
 spec = do
   describe "someFunction" $ do

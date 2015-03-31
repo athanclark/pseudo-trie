@@ -1,18 +1,18 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor              #-}
 
 module Data.Trie.Pseudo where
 
-import Data.Trie.Pseudo.Internal
+import           Data.Trie.Pseudo.Internal
 
-import Prelude hiding (lookup, map, foldr, foldl)
-import Control.Applicative
-import Data.List.NonEmpty (NonEmpty (..), fromList, toList)
-import qualified Data.List.NonEmpty as NE
-import Data.Default
-import Data.Monoid
-import Data.Foldable
-import Data.Maybe (fromMaybe)
-import qualified Data.Semigroup as S
+import           Control.Applicative
+import           Data.Default
+import           Data.Foldable
+import           Data.List.NonEmpty        (NonEmpty (..), fromList, toList)
+import qualified Data.List.NonEmpty        as NE
+import           Data.Maybe                (fromMaybe)
+import           Data.Monoid
+import qualified Data.Semigroup            as S
+import           Prelude                   hiding (foldl, foldr, lookup, map)
 
 -- TODO: normalize, pointWise, difference
 -- normalize:
@@ -25,6 +25,9 @@ data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Nil
   deriving (Show, Eq, Functor)
 
+-- newtype RootedTrie t a = RootedTrie (PseudoTrie t a)
+--   deriving (Show, Eq, Functor)
+
 instance Foldable (PseudoTrie t) where
   foldr _ acc Nil = acc
   foldr f acc (Rest _ x) = f x acc
@@ -35,17 +38,20 @@ instance Foldable (PseudoTrie t) where
     where
       go x bcc = foldr f bcc x
 
-toAssocs :: Default t => PseudoTrie t a -> [(NonEmpty t, a)]
+toAssocs :: (Default t) => PseudoTrie t a -> [(NonEmpty t, a)]
 toAssocs = go (def :| []) []
   where
     go :: NonEmpty t -> [(NonEmpty t, a)] -> PseudoTrie t a -> [(NonEmpty t, a)]
     go depth acc Nil = acc
     go depth acc (Rest ts x) = (depth S.<> ts, x) : acc
     go depth acc (More (t, Nothing) xs) =
-      (foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs)
+      foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs
     go depth acc (More (t, Just x) xs) =
       (depth S.<> (t :| []), x) :
-        (foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs)
+        foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs
+
+fromAssocs :: (Eq t, Default t) => [(NonEmpty t, a)] -> PseudoTrie t a
+fromAssocs = foldr (uncurry add) Nil
 
 instance (Eq t, Default t) => Monoid (PseudoTrie t a) where
   mempty = Nil
@@ -119,5 +125,8 @@ union (Rest tss@(t:|ts) x) (More (p,my) ys)
   -- disjoint
   | otherwise = More (def,Nothing) $
                   Rest tss x :| [More (p,my) ys]
+
+add :: (Eq t, Default t) => NonEmpty t -> a -> PseudoTrie t a -> PseudoTrie t a
+add ts x trie = trie `union` Rest ts x
 
 -- instance Default t =>
