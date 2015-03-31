@@ -53,9 +53,9 @@ toAssocs = go (def :| []) []
 fromAssocs :: (Eq t, Default t) => [(NonEmpty t, a)] -> PseudoTrie t a
 fromAssocs = foldr (uncurry add) Nil
 
-instance (Eq t, Default t) => Monoid (PseudoTrie t a) where
+instance (Eq t, Default t, Monoid a) => Monoid (PseudoTrie t a) where
   mempty = Nil
-  x `mappend` y = x `union` y
+  mappend = unionWith mappend
 
 lookup :: (Eq t) => NonEmpty t -> PseudoTrie t a -> Maybe a
 lookup _ Nil = Nothing
@@ -73,60 +73,116 @@ lookup tss@(t:|ts) (More (p,mx) xs) | t == p =
     hasNextTag t (Rest (p:|_) _) = t == p
 
 -- | Rightward bias
-union :: (Eq t, Default t) => PseudoTrie t a -> PseudoTrie t a -> PseudoTrie t a
-union Nil Nil = Nil
-union x Nil = x
-union Nil y = y
-union (Rest tss@(t:|ts) x) (Rest pss@(p:|ps) y)
-  | tss == pss = Rest pss y
-  | t == p = case (ts,ps) of
-               ([],p':ps') -> More (t,Just x) $ Rest (fromList ps) y :| []
-               (t':ts',[]) -> More (p,Just y) $ Rest (fromList ts) x :| []
-               (_,_) -> More (t,Nothing) $
-                          Rest (fromList ts) x `union` Rest (fromList ps) y :| []
-  -- root normalization
-  | t == def = case ts of
-                [] -> More (def,Just x) $ fromList [Rest
-                        (if p == def then fromList ps else pss)
-                        y]
-                _  -> Rest (fromList ts) x `union` Rest pss y
-  | p == def = case ps of
-                [] -> More (def,Just y) $ fromList [Rest
-                        (if t == def then fromList ts else tss)
-                        y]
-                _  -> Rest tss x `union` Rest (fromList ps) y
-  | otherwise = Rest pss y
-union (More (t,mx) xs) (More (p,my) ys)
-  | t == p = let zs = NE.toList xs ++ NE.toList ys in
-             More (p,my) $ fromList $
-              foldl (\(z':zs') q -> z' `union` q : zs') [head zs] (tail zs)
-  | t == def = More (def,mx) $
-                 fmap (`union` More (p,my) ys) xs
-  | p == def = More (def,my) $
-                 fmap (`union` More (t,mx) xs) ys
-  -- disjoint
-  | otherwise = More (def,Nothing) $
-                  More (t,mx) xs :| [More (p,my) ys]
-union (More (t,mx) xs) (Rest pss@(p:|ps) y)
-  | t == p = case ps of
-               [] -> More (p,Just y) xs
-               _  -> More (t,mx) $ fmap (`union` Rest (fromList ps) y) xs
-  | t == def = More (def,mx) $ fmap (`union` Rest pss y) xs
-  | p == def = More (t,mx) xs `union` Rest (fromList ps) y
-  -- disjoint
-  | otherwise = More (def,Nothing) $
-                  More (t,mx) xs :| [Rest pss y]
-union (Rest tss@(t:|ts) x) (More (p,my) ys)
-  | t == p = case ts of
-               [] -> More (t,Just x) ys
-               _  -> More (p,my) $ fmap (Rest (fromList ts) x `union`) ys
-  | t == def = Rest (fromList ts) x `union` More (p,my) ys
-  | p == def = More (def,my) $ fmap (Rest tss x `union`) ys
-  -- disjoint
-  | otherwise = More (def,Nothing) $
-                  Rest tss x :| [More (p,my) ys]
+-- union :: (Eq t, Default t) => PseudoTrie t a -> PseudoTrie t a -> PseudoTrie t a
+-- union Nil Nil = Nil
+-- union x Nil = x
+-- union Nil y = y
+-- union (Rest tss@(t:|ts) x) (Rest pss@(p:|ps) y)
+--   | tss == pss = Rest pss y
+--   | t == p = case (ts,ps) of
+--                ([],p':ps') -> More (t,Just x) $ Rest (fromList ps) y :| []
+--                (t':ts',[]) -> More (p,Just y) $ Rest (fromList ts) x :| []
+--                (_,_) -> More (t,Nothing) $
+--                           Rest (fromList ts) x `union` Rest (fromList ps) y :| []
+--   -- root normalization
+--   | t == def = case ts of
+--                 [] -> More (def,Just x) $ fromList [Rest
+--                         (if p == def then fromList ps else pss)
+--                         y]
+--                 _  -> Rest (fromList ts) x `union` Rest pss y
+--   | p == def = case ps of
+--                 [] -> More (def,Just y) $ fromList [Rest
+--                         (if t == def then fromList ts else tss)
+--                         y]
+--                 _  -> Rest tss x `union` Rest (fromList ps) y
+--   | otherwise = Rest pss y
+-- union (More (t,mx) xs) (More (p,my) ys)
+--   | t == p = let zs = NE.toList xs ++ NE.toList ys in
+--              More (p,my) $ fromList $
+--               foldl (\(z':zs') q -> z' `union` q : zs') [head zs] (tail zs)
+--   | t == def = More (def,mx) $
+--                  fmap (`union` More (p,my) ys) xs
+--   | p == def = More (def,my) $
+--                  fmap (`union` More (t,mx) xs) ys
+--   -- disjoint
+--   | otherwise = More (def,Nothing) $
+--                   More (t,mx) xs :| [More (p,my) ys]
+-- union (More (t,mx) xs) (Rest pss@(p:|ps) y)
+--   | t == p = case ps of
+--                [] -> More (p,Just y) xs
+--                _  -> More (t,mx) $ fmap (`union` Rest (fromList ps) y) xs
+--   | t == def = More (def,mx) $ fmap (`union` Rest pss y) xs
+--   | p == def = More (t,mx) xs `union` Rest (fromList ps) y
+--   -- disjoint
+--   | otherwise = More (def,Nothing) $
+--                   More (t,mx) xs :| [Rest pss y]
+-- union (Rest tss@(t:|ts) x) (More (p,my) ys)
+--   | t == p = case ts of
+--                [] -> More (t,Just x) ys
+--                _  -> More (p,my) $ fmap (Rest (fromList ts) x `union`) ys
+--   | t == def = Rest (fromList ts) x `union` More (p,my) ys
+--   | p == def = More (def,my) $ fmap (Rest tss x `union`) ys
+--   -- disjoint
+--   | otherwise = More (def,Nothing) $
+--                   Rest tss x :| [More (p,my) ys]
 
 add :: (Eq t, Default t) => NonEmpty t -> a -> PseudoTrie t a -> PseudoTrie t a
-add ts x trie = trie `union` Rest ts x
+add ts x trie = unionWith (const id) trie $ Rest ts x
+
+unionWith :: (Eq t, Default t) =>
+             (a -> a -> a)
+          -> PseudoTrie t a
+          -> PseudoTrie t a
+          -> PseudoTrie t a
+unionWith _ Nil Nil = Nil
+unionWith _ Nil y = y
+unionWith _ x Nil = x
+unionWith f (Rest tss@(t:|ts) x) (Rest pss@(p:|ps) y)
+  | tss == pss = Rest pss $ f x y
+  | t == p = case (ts,ps) of
+               ([], p':ps') -> More (t, Just x) $ Rest (fromList ps) y :| []
+               (t':ts', []) -> More (p, Just y) $ Rest (fromList ts) x :| []
+               (_,_) -> More (t,Nothing) $ fromList
+                          [unionWith f (Rest (fromList ts) x) (Rest (fromList ps) y)]
+  -- root normalization
+  | t == def = case ts of
+                [] -> More (def,Just x) $ fromList [Rest pss y]
+                _  -> unionWith f (Rest (fromList ts) x) (Rest pss y)
+  | p == def = case ps of
+                [] -> More (def,Just y) $ fromList [Rest tss y]
+                _  -> unionWith f (Rest tss x) (Rest (fromList ps) y)
+  | otherwise = More (def,Nothing) $ fromList [Rest tss x, Rest pss y]
+unionWith f (More (t,mx) xs) (More (p,my) ys)
+  | t == p = let zs = NE.toList xs ++ NE.toList ys in
+             More (p,f <$> mx <*> my) $ fromList $
+               foldl (\(z':zs') q -> unionWith f z' q : zs') [head zs] (tail zs)
+  | t == def = More (def,mx) $
+                 fmap ((flip $ unionWith f) $ More (p,my) ys) xs
+  | p == def = More (def,my) $
+                 fmap (unionWith f $ More (t,mx) xs) ys
+  -- disjoint
+  | otherwise = More (def,Nothing) $ fromList [More (t,mx) xs, More (p,my) ys]
+unionWith f (More (t,mx) xs) (Rest pss@(p:|ps) y)
+  | t == p = case ps of
+               [] -> More (p,f <$> mx <*> Just y) xs
+               _  -> More (t,mx) $ fmap ((flip $ unionWith f) $ Rest (fromList ps) y) xs
+  | t == def = More (def,mx) $ fmap ((flip $ unionWith f) $ Rest pss y) xs
+  | p == def = unionWith f (More (t,mx) xs) (Rest (fromList ps) y)
+  -- disjoint
+  | otherwise = More (def,Nothing) $ fromList [More (t,mx) xs, Rest pss y]
+unionWith f (Rest tss@(t:|ts) x) (More (p,my) ys)
+  | t == p = case ts of
+               [] -> More (t,f <$> Just x <*> my) ys
+               _  -> More (p,my) $ fmap (unionWith f $ Rest (fromList ts) x) ys
+  | t == def = unionWith f (Rest (fromList ts) x) (More (p,my) ys)
+  | p == def = More (def,my) $ fmap (unionWith f $ Rest tss x) ys
+  -- disjoint
+  | otherwise = More (def,Nothing) $ fromList [Rest tss x, More (p,my) ys]
+
+-- intersectionWith :: Eq t =>
+--                     (a -> b -> c)
+--                  -> PseudoTrie t a
+--                  -> PseudoTrie t b
+--                  -> PseudoTrie t c
 
 -- instance Default t =>
