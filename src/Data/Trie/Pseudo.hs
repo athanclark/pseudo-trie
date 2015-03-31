@@ -12,6 +12,7 @@ import Data.Default
 import Data.Monoid
 import Data.Foldable
 import Data.Maybe (fromMaybe)
+import qualified Data.Semigroup as S
 
 -- TODO: normalize, pointWise, difference
 -- normalize:
@@ -34,10 +35,17 @@ instance Foldable (PseudoTrie t) where
     where
       go x bcc = foldr f bcc x
 
--- toAssocs :: PseudoTrie t a -> [(NonEmpty t, a)]
--- toAssocs Nil = []
--- toAssocs (Rest ts x) = [(ts, x)]
--- toAssocs (More (t, mx) xs) =
+toAssocs :: Default t => PseudoTrie t a -> [(NonEmpty t, a)]
+toAssocs = go (def :| []) []
+  where
+    go :: NonEmpty t -> [(NonEmpty t, a)] -> PseudoTrie t a -> [(NonEmpty t, a)]
+    go depth acc Nil = acc
+    go depth acc (Rest ts x) = (depth S.<> ts, x) : acc
+    go depth acc (More (t, Nothing) xs) =
+      (foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs)
+    go depth acc (More (t, Just x) xs) =
+      (depth S.<> (t :| []), x) :
+        (foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs)
 
 instance (Eq t, Default t) => Monoid (PseudoTrie t a) where
   mempty = Nil
