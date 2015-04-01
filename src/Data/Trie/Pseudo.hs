@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Data.Trie.Pseudo where
 
@@ -13,6 +15,8 @@ import           Data.Maybe                (fromMaybe)
 import           Data.Monoid
 import qualified Data.Semigroup            as S
 import           Prelude                   hiding (foldl, foldr, foldr1, lookup, map)
+import Test.QuickCheck
+import Test.QuickCheck.Instances
 
 -- TODO: normalize, difference
 -- normalize:
@@ -24,6 +28,17 @@ data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Rest (NonEmpty t) a
                     | Nil
   deriving (Show, Eq, Functor)
+
+instance (Arbitrary t, Arbitrary a) => Arbitrary (PseudoTrie t a) where
+  arbitrary = do
+    (ts :: [t]) <- listOf1 arbitrary
+    (x :: a) <- arbitrary
+    (t :: t) <- arbitrary
+    (mx :: Maybe a) <- arbitrary
+    (xs :: [PseudoTrie t a]) <- listOf1 arbitrary
+    oneof [ return Nil
+          , return $ Rest (fromList ts) x
+          , return $ More (t,mx) $ fromList xs]
 
 -- | Depth first
 instance Foldable (PseudoTrie t) where
@@ -167,8 +182,8 @@ intersectionWith f (Rest tss@(t:|ts) x) (More (p,my) ys)
 --            -> PseudoTrie t a
 --            -> PseudoTrie t a
 
--- | @More (Nil)@ -> singleton @Rest@, children with Nil are removed,
--- @More Nothing (More Nothing ... More x (Nil))@ are reduced.
+-- | Needless @More@ elements are turned into @Rest@, @Nil@'s in subtrees are
+-- also removed.
 prune :: (Eq t, Default t) => PseudoTrie t a -> PseudoTrie t a
 prune = go Nothing
   where

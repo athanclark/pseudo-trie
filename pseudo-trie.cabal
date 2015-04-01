@@ -18,6 +18,8 @@ Library
   Build-Depends:        base >= 4 && < 5
                       , semigroups
                       , data-default
+                      , QuickCheck
+                      , quickcheck-instances
 
 Test-Suite spec
   Type:                 exitcode-stdio-1.0
@@ -30,6 +32,8 @@ Test-Suite spec
                       , hspec
                       , QuickCheck
                       , quickcheck-instances
+                      , data-default
+                      , semigroups
 
 Source-Repository head
   Type:                 git

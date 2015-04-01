@@ -18,9 +18,9 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  describe "someFunction" $ do
-    it "should work fine" $ do
-      property someFunction
+  describe "reconstruction" $ do
+    it "`fromAssocs . toAssocs` should ~ `prune`" $ do
+      property fromToPrune
 
-someFunction :: Bool -> Bool -> Property
-someFunction x y = x === y
+fromToPrune :: PseudoTrie String Int -> Property
+fromToPrune x = (fromAssocs $ toAssocs x) === prune x
