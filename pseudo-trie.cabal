@@ -14,10 +14,9 @@ Library
   HS-Source-Dirs:       src
   GHC-Options:          -Wall
   Exposed-Modules:      Data.Trie.Pseudo
-  Other-Modules:        Data.Trie.Pseudo.Internal
+                        Data.Trie.Rooted
   Build-Depends:        base >= 4 && < 5
                       , semigroups
-                      , data-default
                       , QuickCheck
                       , quickcheck-instances
 
