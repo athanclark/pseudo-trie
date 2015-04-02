@@ -53,7 +53,13 @@ lookup ts (Rooted _ xs) = foldr (go ts) Nothing xs
     go ts x ma@(Just a) = ma
 
 
--- ["a"] 0 Rooted (Just (-2)) [More ("",Just (-1)) (More ("g:",Just 0) (Rest ("" :| ["W)"]) (-1) :| []) :| [More ("",Nothing) (Nil :| [])])]
+-- ["a"] 0 Rooted (Just (-2))
+            --  [More ("",Just (-1))
+            --     (More ("g:",Just 0)
+            --       (Rest ("" :| ["W)"]) (-1)
+            --    :| [])
+            --  :| [More ("",Nothing) (Nil :| [])] )
+            --  ]
 
 
 

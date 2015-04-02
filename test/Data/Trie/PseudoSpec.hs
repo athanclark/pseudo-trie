@@ -27,4 +27,4 @@ spec = do
     prop "`fromAssocs . toAssocs` should ~ `prune`" fromToPrune
 
 fromToPrune :: PseudoTrie String Int -> Property
-fromToPrune trie = trie === prune trie
+fromToPrune trie = (fromAssocs $ toAssocs trie) === prune trie

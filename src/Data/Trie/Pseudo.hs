@@ -6,6 +6,7 @@ module Data.Trie.Pseudo where
 
 import           Control.Applicative
 import           Data.Foldable
+import Data.List (intercalate)
 import           Data.List.NonEmpty        (NonEmpty (..), fromList, toList)
 import qualified Data.List.NonEmpty        as NE
 import           Data.Maybe                (fromMaybe)
@@ -22,7 +23,19 @@ import           Test.QuickCheck.Instances
 data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Rest (NonEmpty t) a
                     | Nil
-  deriving (Show, Eq, Functor)
+  deriving (Eq, Functor)
+
+instance (Show t, Show a) => Show (PseudoTrie t a) where
+  show Nil = "Ø "
+  show (Rest ts a) = "R: " ++ (intercalate " ~ " $ NE.toList $ fmap show ts) ++ " (" ++ show a ++ ") "
+  show (More (t,Nothing) as) =
+    show t ++ " / {"
+      ++ ((NE.toList as) >>= (\y -> show y ++ " + "))
+      ++ "}\n"
+  show (More (t,Just a) as) =
+    show t ++ " (" ++ show a ++ ") / {"
+      ++ ((NE.toList as) >>= (\y -> show y ++ " + "))
+      ++ "}\n"
 
 instance (Arbitrary t, Arbitrary a) => Arbitrary (PseudoTrie t a) where
   arbitrary = do
