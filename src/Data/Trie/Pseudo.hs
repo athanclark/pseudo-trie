@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Data.Trie.Pseudo where
 
@@ -14,15 +14,12 @@ import qualified Data.List.NonEmpty        as NE
 import           Data.Maybe                (fromMaybe)
 import           Data.Monoid
 import qualified Data.Semigroup            as S
-import           Prelude                   hiding (foldl, foldr, foldr1, lookup, map)
-import Test.QuickCheck
-import Test.QuickCheck.Instances
+import           Prelude                   hiding (foldl, foldr, foldr1, lookup,
+                                            map)
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances
 
--- TODO: normalize, difference
--- normalize:
---   - remove needless roots
---   - remove needless Nils
-
+-- TODO: difference
 -- | Non-Empty Rose Tree with explicit emptyness
 data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Rest (NonEmpty t) a
@@ -38,7 +35,8 @@ instance (Arbitrary t, Arbitrary a) => Arbitrary (PseudoTrie t a) where
     (xs :: [PseudoTrie t a]) <- listOf1 arbitrary
     oneof [ return Nil
           , return $ Rest (fromList ts) x
-          , return $ More (t,mx) $ fromList xs]
+          , return $ More (t,mx) $ fromList xs
+          ]
 
 -- | Depth first
 instance Foldable (PseudoTrie t) where
@@ -51,17 +49,17 @@ instance Foldable (PseudoTrie t) where
     where
       go z bcc = foldr f bcc z
 
-toAssocs :: (Default t) => PseudoTrie t a -> [(NonEmpty t, a)]
-toAssocs = go (def :| []) []
+toAssocs :: PseudoTrie t a -> [(NonEmpty t, a)]
+toAssocs = go [] []
   where
-    go :: NonEmpty t -> [(NonEmpty t, a)] -> PseudoTrie t a -> [(NonEmpty t, a)]
+    go :: [t] -> [(NonEmpty t, a)] -> PseudoTrie t a -> [(NonEmpty t, a)]
     go depth acc Nil = acc
-    go depth acc (Rest ts x) = (depth S.<> ts, x) : acc
+    go depth acc (Rest ts x) = ((NE.fromList depth) S.<> ts, x) : acc
     go depth acc (More (t, Nothing) xs) =
-      foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs
+      foldr (flip $ go $ depth ++ [t]) acc $ NE.toList xs
     go depth acc (More (t, Just x) xs) =
-      (depth S.<> (t :| []), x) :
-        (foldr (flip $ go $ depth S.<> (t :| [])) acc $ NE.toList xs)
+      (NE.fromList $ depth ++ [t], x) :
+        ((foldr $ flip $ go $ depth ++ [t]) acc $ NE.toList xs)
 
 fromAssocs :: (Eq t, Default t) => [(NonEmpty t, a)] -> PseudoTrie t a
 fromAssocs = foldr (uncurry set) Nil
