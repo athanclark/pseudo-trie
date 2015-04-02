@@ -1,31 +1,44 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Data.Trie.Rooted where
 
-import Prelude
-import Data.Trie.Pseudo
-import Data.Monoid
-import Control.Applicative
-import Data.List.NonEmpty hiding (head, tail)
-import qualified Data.List.NonEmpty as NE
+import           Control.Applicative
+import           Data.List.NonEmpty  hiding (head, tail)
+import qualified Data.List.NonEmpty  as NE
+import           Data.Monoid
+import           Data.Trie.Pseudo
+import           Test.QuickCheck
+import           Test.QuickCheck.Instances
+
 
 data Rooted t a = Rooted (Maybe a) [PseudoTrie t a]
   deriving (Show, Eq, Functor)
 
+instance (Arbitrary t, Arbitrary a) => Arbitrary (Rooted t a) where
+  arbitrary = do
+    (mx :: Maybe a) <- arbitrary
+    (xs :: [PseudoTrie t a]) <- arbitrary
+    return $ Rooted mx xs
+
+-- | Intersection instance
 instance (Eq t) => Applicative (Rooted t) where
   pure x = Rooted (Just x) []
   (<*>) (Rooted mf fs) (Rooted mx xs) =
     Rooted (mf <*> mx) $
       [intersectionWith ($) f x | f <- fs, x <- xs]
 
+-- | Union instance
 instance (Eq t, Monoid a) => Monoid (Rooted t a) where
   mempty = Rooted Nothing []
   mappend = unionWith mappend
 
+-- | Strictly constructive form of @Data.Trie.Pseudo.assign@
 set :: (Eq t) => [t] -> a -> Rooted t a -> Rooted t a
 set [] x = unionWith const $ Rooted (Just x) []
 set ts x = unionWith const $ Rooted Nothing [Rest (NE.fromList ts) x]
 
+-- | Disjoint cases just merge children to common root
 unionWith :: (Eq t) =>
              (a -> a -> a)
           -> Rooted t a

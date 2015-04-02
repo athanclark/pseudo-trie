@@ -4,8 +4,6 @@
 
 module Data.Trie.Pseudo where
 
-import           Data.Trie.Pseudo.Internal
-
 import           Control.Applicative
 import           Data.Foldable
 import           Data.List.NonEmpty        (NonEmpty (..), fromList, toList)
@@ -17,6 +15,7 @@ import           Prelude                   hiding (foldl, foldr, foldr1, lookup,
                                             map)
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances
+
 
 -- TODO: difference
 -- | Non-Empty Rose Tree with explicit emptyness
@@ -37,6 +36,11 @@ instance (Arbitrary t, Arbitrary a) => Arbitrary (PseudoTrie t a) where
           , return $ More (t,mx) $ fromList xs
           ]
 
+-- | Overwriting instance
+instance (Eq t) => Monoid (PseudoTrie t a) where
+  mempty = Nil
+  mappend = merge
+
 -- | Depth first
 instance Foldable (PseudoTrie t) where
   foldr _ acc Nil = acc
@@ -48,6 +52,8 @@ instance Foldable (PseudoTrie t) where
     where
       go z bcc = foldr f bcc z
 
+-- | Provides a form of deletion by setting a path to @Nothing@, but doesn't
+-- cleanup like @prune@
 assign :: (Eq t) => NonEmpty t -> Maybe a -> PseudoTrie t a -> PseudoTrie t a
 assign ts (Just x) Nil = Rest ts x
 assign ts Nothing  Nil = Nil
@@ -128,6 +134,7 @@ lookup tss@(t:|ts) (More (p,mx) xs) | t == p =
     hasNextTag t (More (p,_) _) = t == p
     hasNextTag t (Rest (p:|_) _) = t == p
 
+-- | Simple test on the heads of two tries
 areDisjoint :: (Eq t) => PseudoTrie t a -> PseudoTrie t a -> Bool
 areDisjoint (More (t,_) _) (More (p,_) _)
   | t == p = False
@@ -137,6 +144,7 @@ areDisjoint (Rest (t:|_) _) (Rest (p:|_) _)
   | otherwise = True
 areDisjoint _ _ = True
 
+-- | The meet of two @PseudoTrie@s
 intersectionWith :: (Eq t) =>
                     (a -> b -> c)
                  -> PseudoTrie t a
@@ -175,8 +183,8 @@ intersectionWith f (Rest tss@(t:|ts) x) (More (p,my) ys)
 --            -> PseudoTrie t a
 --            -> PseudoTrie t a
 
--- | Needless @More@ elements are turned into @Rest@, @Nil@'s in subtrees are
--- also removed.
+-- | Needless intermediary elements are turned into shortcuts, @Nil@'s in
+-- subtrees are also removed.
 prune :: (Eq t) => PseudoTrie t a -> PseudoTrie t a
 prune = go Nothing
   where
