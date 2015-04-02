@@ -57,18 +57,23 @@ instance Foldable (PseudoTrie t) where
 assign :: (Eq t) => NonEmpty t -> Maybe a -> PseudoTrie t a -> PseudoTrie t a
 assign ts (Just x) Nil = Rest ts x
 assign ts Nothing  Nil = Nil
-assign tss@(t:|ts) mx (Rest pss@(p:|ps) y)
+assign tss@(t:|ts) mx ys@(Rest pss@(p:|ps) y)
   | tss == pss = case mx of
                    (Just x) -> Rest pss x
                    Nothing  -> Nil
-  | t == p = case ts of
-               [] -> More (t,mx) $ Rest (NE.fromList ps) y :| []
-               _  -> More (t,Nothing) $
-                       (assign (NE.fromList ts) mx $ Rest (NE.fromList ps) y) :| []
-assign (t:|ts) mx (More (p,my) ys)
+  | t == p = case (ts,ps) of
+               ([],p':_) -> More (t,mx) $ Rest (NE.fromList ps) y :| []
+               (t':_,[]) -> case mx of
+                              Just x  -> More (p,Just y) $ (Rest (NE.fromList ts) x) :| []
+                              Nothing -> ys
+               (_,_)     -> More (t,Nothing) $
+                              (assign (NE.fromList ts) mx $ Rest (NE.fromList ps) y) :| []
+  | otherwise = ys
+assign (t:|ts) mx y@(More (p,my) ys)
   | t == p = case ts of
                [] -> More (p,mx) ys
                _  -> More (p,my) $ fmap (assign (NE.fromList ts) mx) ys
+  | otherwise = y
 
 -- | Overwrite the LHS point-wise with the RHS's contents
 merge :: (Eq t) => PseudoTrie t a -> PseudoTrie t a -> PseudoTrie t a

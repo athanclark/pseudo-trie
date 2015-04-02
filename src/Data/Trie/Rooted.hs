@@ -7,7 +7,7 @@ import           Control.Applicative
 import           Data.List.NonEmpty  hiding (head, tail)
 import qualified Data.List.NonEmpty  as NE
 import           Data.Monoid
-import           Data.Trie.Pseudo
+import Data.Trie.Pseudo as P
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances
 
@@ -35,10 +35,38 @@ instance (Eq t, Monoid a) => Monoid (Rooted t a) where
 
 -- | Strictly constructive form of @Data.Trie.Pseudo.assign@
 set :: (Eq t) => [t] -> a -> Rooted t a -> Rooted t a
-set [] x = unionWith const $ Rooted (Just x) []
-set ts x = unionWith const $ Rooted Nothing [Rest (NE.fromList ts) x]
+set [] x = flip Data.Trie.Rooted.merge $
+             Rooted (Just x) [] -- TODO: Change to merge
+set ts x = flip Data.Trie.Rooted.merge $
+             Rooted Nothing [Rest (NE.fromList ts) x]
 
--- | Disjoint cases just merge children to common root
+lookup :: (Eq t) => [t] -> Rooted t a -> Maybe a
+lookup [] (Rooted mx _) = mx
+lookup ts (Rooted _ xs) = foldr (go ts) Nothing xs
+  where
+    go ts x Nothing     = P.lookup (NE.fromList ts) x
+    go ts x ma@(Just a) = ma
+
+
+
+-- [""] 0 Rooted Nothing []
+--        Nothing /= Just 0
+
+
+
+merge :: (Eq t) =>
+         Rooted t a
+      -> Rooted t a
+      -> Rooted t a
+merge (Rooted mx xs) (Rooted my ys) =
+  Rooted (getLast $ (Last mx) <> (Last my)) $
+    foldr go [] $ xs ++ ys
+  where
+    go q [] = [q]
+    go q (z:zs) | areDisjoint q z = q : z : zs
+                | otherwise = P.merge q z : zs
+
+-- | Disjoint cases just pull children to common root
 unionWith :: (Eq t) =>
              (a -> a -> a)
           -> Rooted t a
