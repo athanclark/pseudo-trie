@@ -34,11 +34,16 @@ instance (Eq t, Monoid a) => Monoid (Rooted t a) where
   mappend = unionWith mappend
 
 -- | Strictly constructive form of @Data.Trie.Pseudo.assign@
-set :: (Eq t) => [t] -> a -> Rooted t a -> Rooted t a
-set [] x = flip Data.Trie.Rooted.merge $
-             Rooted (Just x) [] -- TODO: Change to merge
-set ts x = flip Data.Trie.Rooted.merge $
-             Rooted Nothing [Rest (NE.fromList ts) x]
+assign :: (Eq t) => [t] -> Maybe a -> Rooted t a -> Rooted t a
+assign [] mx (Rooted _ ys) = Rooted mx ys
+assign tss@(t:ts) mx (Rooted my ys)
+  | any (`beginsWith` t) ys =
+      Rooted my $ fmap (P.assign (NE.fromList tss) mx) ys
+  | otherwise = case mx of
+                  Nothing -> Rooted my ys -- nowhere to remove
+                  Just x  -> Rooted my $ (Rest (NE.fromList tss) x) : ys
+-- assign ts x = flip Data.Trie.Rooted.merge $
+--                 Rooted Nothing [Rest (NE.fromList ts) x]
 
 lookup :: (Eq t) => [t] -> Rooted t a -> Maybe a
 lookup [] (Rooted mx _) = mx
@@ -48,9 +53,7 @@ lookup ts (Rooted _ xs) = foldr (go ts) Nothing xs
     go ts x ma@(Just a) = ma
 
 
-
--- [""] 0 Rooted Nothing []
---        Nothing /= Just 0
+-- ["a"] 0 Rooted (Just (-2)) [More ("",Just (-1)) (More ("g:",Just 0) (Rest ("" :| ["W)"]) (-1) :| []) :| [More ("",Nothing) (Nil :| [])])]
 
 
 

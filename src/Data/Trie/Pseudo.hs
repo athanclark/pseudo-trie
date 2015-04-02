@@ -52,6 +52,11 @@ instance Foldable (PseudoTrie t) where
     where
       go z bcc = foldr f bcc z
 
+beginsWith :: (Eq t) => PseudoTrie t a -> t -> Bool
+beginsWith Nil _ = False
+beginsWith (Rest (t:|_) _) p = t == p
+beginsWith (More (t,_) _) p  = t == p
+
 -- | Provides a form of deletion by setting a path to @Nothing@, but doesn't
 -- cleanup like @prune@
 assign :: (Eq t) => NonEmpty t -> Maybe a -> PseudoTrie t a -> PseudoTrie t a
@@ -125,13 +130,15 @@ fromAssocs :: (Eq t) => [(NonEmpty t, a)] -> PseudoTrie t a
 fromAssocs = foldr (uncurry assign) Nil . fmap (\(x,y) -> (x,Just y))
 
 lookup :: (Eq t) => NonEmpty t -> PseudoTrie t a -> Maybe a
-lookup _ Nil = Nothing
-lookup tss (Rest pss a) | tss == pss = Just a
-                        | otherwise = Nothing
-lookup tss@(t:|ts) (More (p,mx) xs) | t == p =
-  case ts of
-    [] -> mx
-    (t':ts') -> find (hasNextTag t') xs >>= lookup (fromList ts)
+lookup _   Nil = Nothing
+lookup tss (Rest pss a)
+  | tss == pss = Just a
+  | otherwise = Nothing
+lookup tss@(t:|ts) (More (p,mx) xs)
+  | t == p = case ts of
+               [] -> mx
+               (t':ts') -> find (hasNextTag t') xs >>= lookup (fromList ts)
+  | otherwise = Nothing
 
   where
     hasNextTag :: (Eq t) => t -> PseudoTrie t a -> Bool
