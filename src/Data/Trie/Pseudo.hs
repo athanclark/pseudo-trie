@@ -1,11 +1,11 @@
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell     #-}
 
 module Data.Trie.Pseudo where
 
+import Control.Arrow (second)
 import           Control.Applicative
-import           Data.Foldable
+import           Data.Foldable hiding (all)
 import Data.List (intercalate)
 import           Data.List.NonEmpty        (NonEmpty (..), fromList, toList)
 import qualified Data.List.NonEmpty        as NE
@@ -27,14 +27,14 @@ data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
 
 instance (Show t, Show a) => Show (PseudoTrie t a) where
   show Nil = "Ø "
-  show (Rest ts a) = "R: " ++ (intercalate " ~ " $ NE.toList $ fmap show ts) ++ " (" ++ show a ++ ") "
+  show (Rest ts a) = "R: " ++ intercalate " ~ " (NE.toList $ fmap show ts) ++ " (" ++ show a ++ ") "
   show (More (t,Nothing) as) =
     show t ++ " / {"
-      ++ ((NE.toList as) >>= (\y -> show y ++ " + "))
+      ++ (NE.toList as >>= (\y -> show y ++ " + "))
       ++ "}\n"
   show (More (t,Just a) as) =
     show t ++ " (" ++ show a ++ ") / {"
-      ++ ((NE.toList as) >>= (\y -> show y ++ " + "))
+      ++ (NE.toList as >>= (\y -> show y ++ " + "))
       ++ "}\n"
 
 instance (Arbitrary t, Arbitrary a) => Arbitrary (PseudoTrie t a) where
@@ -82,10 +82,10 @@ assign tss@(t:|ts) mx ys@(Rest pss@(p:|ps) y)
   | t == p = case (ts,ps) of
                ([],p':_) -> More (t,mx) $ Rest (NE.fromList ps) y :| []
                (t':_,[]) -> case mx of
-                              Just x  -> More (p,Just y) $ (Rest (NE.fromList ts) x) :| []
+                              Just x  -> More (p,Just y) $ Rest (NE.fromList ts) x :| []
                               Nothing -> ys
                (_,_)     -> More (t,Nothing) $
-                              (assign (NE.fromList ts) mx $ Rest (NE.fromList ps) y) :| []
+                              assign (NE.fromList ts) mx (Rest (NE.fromList ps) y) :| []
   | otherwise = ys
 assign (t:|ts) mx y@(More (p,my) ys)
   | t == p = case ts of
@@ -100,15 +100,15 @@ merge x Nil = x
 merge xx@(Rest tss@(t:|ts) x) (Rest pss@(p:|ps) y)
   | tss == pss = Rest pss y
   | t == p = case (ts,ps) of
-               ([],p':ps') -> More (t,Just x) $ (Rest (NE.fromList ps) y) :| []
-               (t':ts',[]) -> More (t,Just y) $ (Rest (NE.fromList ts) x) :| []
+               ([],p':ps') -> More (t,Just x) $ Rest (NE.fromList ps) y :| []
+               (t':ts',[]) -> More (t,Just y) $ Rest (NE.fromList ts) x :| []
                (_,_)       -> More (t,Nothing) $
-                                (merge (Rest (NE.fromList ts) x) $
-                                       Rest (NE.fromList ps) y) :| []
+                                merge (Rest (NE.fromList ts) x)
+                                      (Rest (NE.fromList ps) y) :| []
   | otherwise = xx
 merge xx@(More (t,mx) xs) (More (p,my) ys)
   | t == p = More (p,my) $ NE.fromList $
-              foldr go [] (NE.toList xs) ++ (NE.toList ys)
+              foldr go [] $ NE.toList xs ++ NE.toList ys
   | otherwise = xx
   where
     go q [] = [q]
@@ -132,15 +132,15 @@ toAssocs = go [] []
   where
     go :: [t] -> [(NonEmpty t, a)] -> PseudoTrie t a -> [(NonEmpty t, a)]
     go depth acc Nil = acc
-    go depth acc (Rest ts x) = ((NE.fromList depth) S.<> ts, x) : acc
+    go depth acc (Rest ts x) = (NE.fromList $ depth ++ NE.toList ts, x) : acc
     go depth acc (More (t, Nothing) xs) =
       foldr (flip $ go $ depth ++ [t]) acc $ NE.toList xs
     go depth acc (More (t, Just x) xs) =
       (NE.fromList $ depth ++ [t], x) :
-        ((foldr $ flip $ go $ depth ++ [t]) acc $ NE.toList xs)
+        (foldr $ flip $ go $ depth ++ [t]) acc (NE.toList xs)
 
 fromAssocs :: (Eq t) => [(NonEmpty t, a)] -> PseudoTrie t a
-fromAssocs = foldr (uncurry assign) Nil . fmap (\(x,y) -> (x,Just y))
+fromAssocs = foldr (uncurry assign) Nil . fmap (second Just)
 
 lookup :: (Eq t) => NonEmpty t -> PseudoTrie t a -> Maybe a
 lookup _   Nil = Nothing
@@ -185,7 +185,7 @@ intersectionWith f (More (t,mx) xs) (More (p,my) ys)
                [] -> case f <$> mx <*> my of
                        Nothing -> Nil
                        Just c  -> Rest (p :| []) c
-               zs -> More (p,f <$> mx <*> my) $ fromList $ zs
+               zs -> More (p,f <$> mx <*> my) $ NE.fromList zs
   -- implicit root
   | otherwise = Nil
 intersectionWith f (More (t,mx) xs) (Rest pss@(p:|ps) y)
@@ -193,7 +193,7 @@ intersectionWith f (More (t,mx) xs) (Rest pss@(p:|ps) y)
                [] -> case f <$> mx <*> Just y of
                      Nothing -> Nil
                      Just c  -> Rest (p :| []) c
-               _  -> More (p,Nothing) $ fmap ((flip $ intersectionWith f) $ Rest (fromList ps) y) xs
+               _  -> More (p,Nothing) $ fmap (flip (intersectionWith f) $ Rest (fromList ps) y) xs
   | otherwise = Nil
 intersectionWith f (Rest tss@(t:|ts) x) (More (p,my) ys)
   | t == p = case ts of
@@ -208,28 +208,65 @@ intersectionWith f (Rest tss@(t:|ts) x) (More (p,my) ys)
 --            -> PseudoTrie t a
 --            -> PseudoTrie t a
 
+-- Failing Example:
+-- More ("a",Just 0)
+--   [ More ("b",Just 0)
+--      fromList [Rest (fromList ["c"]) 0]
+--   , More ("b'",Nothing)
+--      fromList [Nil]
+--   ]
+
 -- | Needless intermediary elements are turned into shortcuts, @Nil@'s in
 -- subtrees are also removed.
 prune :: (Eq t) => PseudoTrie t a -> PseudoTrie t a
-prune = go Nothing
-  where
-    go :: (Eq t) => Maybe (NonEmpty t) -> PseudoTrie t a -> PseudoTrie t a
-    go Nothing Nil = Nil
-    go Nothing   (More (t,Nothing) xs) = foldr1 (flip merge) $
-      fmap (go (Just $ NE.fromList [t])) $ removeNils $ NE.toList xs
-    go (Just ts) (More (t,Nothing) xs) = foldr1 (flip merge) $
-      fmap (go (Just $ NE.fromList $ (NE.toList ts) ++ [t])) $ removeNils $ NE.toList xs
-    -- lookahead
-    go (Just ts) (More (t,Just c) (Nil :| [])) =
-      Rest (NE.fromList $ (NE.toList ts) ++ [t]) c
-    go _         (More (t,Just c) xs) =
-      More (t,Just c) $ NE.fromList $
-        fmap (go Nothing) $ removeNils $ NE.toList xs
-    go (Just ts) (Rest ps x) =
-      Rest (NE.fromList $ NE.toList ts ++ NE.toList ps) x
-    go Nothing x@(Rest _  _) = x
+prune Nil  = Nil
+prune xx@(Rest ts x) = xx
+prune (More mt xs) =
+  case (removeNils . fmap process . NE.toList) xs of
+    [] -> More mt (Nil :| [])
+    ys -> More mt $ NE.fromList ys
 
+  where
     removeNils :: [PseudoTrie t a] -> [PseudoTrie t a]
     removeNils [] = []
     removeNils (Nil:xs) = removeNils xs
     removeNils (x:xs) = x : removeNils xs
+
+    -- turns (long nil) -> nil, and (long just) -> rest
+    process :: (Eq t) => PseudoTrie t a -> PseudoTrie t a
+    process (More (t,Nothing) xs)
+      | isNilTree xs = Nil -- should look ahead
+      | singletonJust xs = justToRest [t] $ NE.head xs
+      | otherwise = prune $ More (t,Nothing) $
+                      fmap process xs
+    process (More (t,Just x) xs)
+      | isNilTree xs = More (t,Just x) $ Nil :| []
+      | singletonJust xs = justToRest [] $ NE.head xs
+      | otherwise = prune $ More (t,Just x) $
+                      fmap process xs
+    process x = x
+
+    isNilTree ((More (_,Nothing) xs) :| [])
+      | all isNil (NE.toList xs) = True
+      | otherwise = isNilTree xs
+    isNilTree ((More (_,Nothing) xs) :| ys)
+      | all isNil (NE.toList xs) =
+          isNilTree $ NE.fromList ys
+      | otherwise = isNilTree xs &&
+          (isNilTree $ NE.fromList ys)
+    isNilTree _ = False
+
+    singletonJust ((More (_,Nothing) xs) :| []) =
+      singletonJust xs
+    singletonJust ((More (_,Just x) xs) :| []) =
+      all isNil $ NE.toList xs
+    singletonJust _ = False
+
+    isNil Nil = True
+    isNil _   = False
+
+    -- expects children to be singletons
+    justToRest ts (More (t,Just x) xs) =
+      Rest (NE.fromList $ t:ts) x
+    justToRest ts (More (t,Nothing) (x:|_)) =
+      justToRest (ts ++ [t]) x

@@ -25,7 +25,7 @@ instance (Arbitrary t, Arbitrary a) => Arbitrary (Rooted t a) where
 instance (Eq t) => Applicative (Rooted t) where
   pure x = Rooted (Just x) []
   (<*>) (Rooted mf fs) (Rooted mx xs) =
-    Rooted (mf <*> mx) $
+    Rooted (mf <*> mx)
       [intersectionWith ($) f x | f <- fs, x <- xs]
 
 -- | Union instance
@@ -41,7 +41,7 @@ assign tss@(t:ts) mx (Rooted my ys)
       Rooted my $ fmap (P.assign (NE.fromList tss) mx) ys
   | otherwise = case mx of
                   Nothing -> Rooted my ys -- nowhere to remove
-                  Just x  -> Rooted my $ (Rest (NE.fromList tss) x) : ys
+                  Just x  -> Rooted my $ Rest (NE.fromList tss) x : ys
 -- assign ts x = flip Data.Trie.Rooted.merge $
 --                 Rooted Nothing [Rest (NE.fromList ts) x]
 
@@ -68,7 +68,7 @@ merge :: (Eq t) =>
       -> Rooted t a
       -> Rooted t a
 merge (Rooted mx xs) (Rooted my ys) =
-  Rooted (getLast $ (Last mx) <> (Last my)) $
+  Rooted (getLast $ Last mx <> Last my) $
     foldr go [] $ xs ++ ys
   where
     go q [] = [q]
@@ -106,7 +106,7 @@ unionWith f (Rooted mx xs) (Rooted my ys) =
     unionWith' f (More (t,mx) xs) (Rest pss@(p:|ps) y)
       | t == p = case ps of
                    [] -> More (p,f <$> mx <*> Just y) xs
-                   _  -> More (t,mx) $ fmap ((flip $ unionWith' f) $ Rest (fromList ps) y) xs
+                   _  -> More (t,mx) $ fmap (flip (unionWith' f) $ Rest (fromList ps) y) xs
     unionWith' f (Rest tss@(t:|ts) x) (More (p,my) ys)
       | t == p = case ts of
                    [] -> More (t,f <$> Just x <*> my) ys
