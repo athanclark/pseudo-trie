@@ -6,6 +6,7 @@ module Data.Trie.Pseudo where
 
 import           Control.Applicative
 import           Control.Arrow             (second)
+import Control.Monad (replicateM)
 import           Data.Foldable             hiding (all)
 import           Data.List                 (intercalate)
 import           Data.List.NonEmpty        (NonEmpty (..), fromList, toList)
@@ -28,11 +29,16 @@ data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
 
 instance (Arbitrary a) => Arbitrary (PseudoTrie String a) where
   arbitrary = do
-    (ts :: [String]) <- listOf1 $ (:[]) <$> (arbitrary :: Gen Char)
+    (ts :: [String]) <- do
+                          n <- choose (1,2)
+                          replicateM n $
+                            return <$> (arbitrary :: Gen Char)
     (x :: a) <- arbitrary
-    (t :: String) <- (:[]) <$> arbitrary
+    (t :: String) <- return <$> arbitrary
     (mx :: Maybe a) <- arbitrary
-    (xs :: [PseudoTrie String a]) <- listOf1 arbitrary
+    (xs :: [PseudoTrie String a]) <- do
+                                      n <- choose (1,3)
+                                      replicateM n arbitrary
     oneof [ return Nil
           , return $ Rest (fromList ts) x
           , return $ More (t,mx) $ fromList xs
@@ -63,18 +69,25 @@ beginsWith (More (t,_) _) p  = t == p
 -- cleanup like @prune@
 assign :: (Eq t) => NonEmpty t -> Maybe a -> PseudoTrie t a -> PseudoTrie t a
 assign ts (Just x) Nil = Rest ts x
-assign ts Nothing  Nil = Nil
+assign _  Nothing  Nil = Nil
 assign tss@(t:|ts) mx ys@(Rest pss@(p:|ps) y)
   | tss == pss = case mx of
                    (Just x) -> Rest pss x
                    Nothing  -> Nil
   | t == p = case (ts,ps) of
-               ([],p':_) -> More (t,mx) $ Rest (NE.fromList ps) y :| []
-               (t':_,[]) -> case mx of
-                              Just x  -> More (p,Just y) $ Rest (NE.fromList ts) x :| []
-                              Nothing -> ys
-               (_,_)     -> More (t,Nothing) $
-                              assign (NE.fromList ts) mx (Rest (NE.fromList ps) y) :| []
+               ([],  p':_) -> More (t,mx) $ Rest (NE.fromList ps) y :| []
+               (t':_,  []) -> case mx of
+                                Just x  -> More (p,Just y) $ Rest (NE.fromList ts) x :| []
+                                Nothing -> ys
+               (t':_,p':_) -> if t' == p'
+                                then More (t,Nothing) $
+                                       assign (NE.fromList ts) mx (Rest (NE.fromList ps) y) :| []
+                                else case mx of
+                                       Nothing  -> ys
+                                       Just x   -> More (t,Nothing) $ NE.fromList $
+                                                     [ Rest (NE.fromList ps) y
+                                                     , Rest (NE.fromList ts) x
+                                                     ]
   | otherwise = ys
 assign (t:|ts) mx y@(More (p,my) ys)
   | t == p = case ts of
