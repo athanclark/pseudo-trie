@@ -23,19 +23,19 @@ import           Test.QuickCheck.Instances
 data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Rest (NonEmpty t) a
                     | Nil
-  deriving (Eq, Functor)
+  deriving (Show, Eq, Functor)
 
-instance (Show t, Show a) => Show (PseudoTrie t a) where
-  show Nil = "Ø "
-  show (Rest ts a) = "R: " ++ intercalate " ~ " (NE.toList $ fmap show ts) ++ " (" ++ show a ++ ") "
-  show (More (t,Nothing) as) =
-    show t ++ " / {"
-      ++ (NE.toList as >>= (\y -> show y ++ " + "))
-      ++ "}\n"
-  show (More (t,Just a) as) =
-    show t ++ " (" ++ show a ++ ") / {"
-      ++ (NE.toList as >>= (\y -> show y ++ " + "))
-      ++ "}\n"
+-- instance (Show t, Show a) => Show (PseudoTrie t a) where
+--   show Nil = "Ø "
+--   show (Rest ts a) = "R: " ++ intercalate " ~ " (NE.toList $ fmap show ts) ++ " (" ++ show a ++ ") "
+--   show (More (t,Nothing) as) =
+--     show t ++ " / (Nothing) {"
+--       ++ (NE.toList as >>= (\y -> show y ++ " + "))
+--       ++ "}\n"
+--   show (More (t,Just a) as) =
+--     show t ++ " (" ++ show a ++ ") / {"
+--       ++ (NE.toList as >>= (\y -> show y ++ " + "))
+--       ++ "}\n"
 
 instance (Arbitrary t, Arbitrary a) => Arbitrary (PseudoTrie t a) where
   arbitrary = do
@@ -208,65 +208,30 @@ intersectionWith f (Rest tss@(t:|ts) x) (More (p,my) ys)
 --            -> PseudoTrie t a
 --            -> PseudoTrie t a
 
--- Failing Example:
--- More ("a",Just 0)
---   [ More ("b",Just 0)
---      fromList [Rest (fromList ["c"]) 0]
---   , More ("b'",Nothing)
---      fromList [Nil]
---   ]
 
 -- | Needless intermediary elements are turned into shortcuts, @Nil@'s in
 -- subtrees are also removed.
-prune :: (Eq t) => PseudoTrie t a -> PseudoTrie t a
-prune Nil  = Nil
-prune xx@(Rest ts x) = xx
-prune (More mt xs) =
-  case (removeNils . fmap process . NE.toList) xs of
-    [] -> More mt (Nil :| [])
-    ys -> More mt $ NE.fromList ys
-
+prune :: PseudoTrie t a -> PseudoTrie t a
+prune = go
   where
-    removeNils :: [PseudoTrie t a] -> [PseudoTrie t a]
-    removeNils [] = []
-    removeNils (Nil:xs) = removeNils xs
-    removeNils (x:xs) = x : removeNils xs
+    go Nil = Nil
+    go xx@(Rest ts x) = xx
+    go (More (t,Nothing) xs) =
+      case cleaned xs of
+        [Nil]       -> Nil
+        [Rest ts x] -> Rest (t:|NE.toList ts) x
+        xs'         -> More (t,Nothing) $ NE.fromList xs'
+    go (More (t,Just x) xs) =
+      case cleaned xs of
+        [Nil] -> Rest (t:|[]) x
+        xs'   -> More (t,Just x) $ NE.fromList xs'
 
-    -- turns (long nil) -> nil, and (long just) -> rest
-    process :: (Eq t) => PseudoTrie t a -> PseudoTrie t a
-    process (More (t,Nothing) xs)
-      | isNilTree xs = Nil -- should look ahead
-      | singletonJust xs = justToRest [t] $ NE.head xs
-      | otherwise = prune $ More (t,Nothing) $
-                      fmap process xs
-    process (More (t,Just x) xs)
-      | isNilTree xs = More (t,Just x) $ Nil :| []
-      | singletonJust xs = justToRest [] $ NE.head xs
-      | otherwise = prune $ More (t,Just x) $
-                      fmap process xs
-    process x = x
+    cleaned xs = removeNils (NE.toList $ fmap go xs)
 
-    isNilTree ((More (_,Nothing) xs) :| [])
-      | all isNil (NE.toList xs) = True
-      | otherwise = isNilTree xs
-    isNilTree ((More (_,Nothing) xs) :| ys)
-      | all isNil (NE.toList xs) =
-          isNilTree $ NE.fromList ys
-      | otherwise = isNilTree xs &&
-          (isNilTree $ NE.fromList ys)
-    isNilTree _ = False
-
-    singletonJust ((More (_,Nothing) xs) :| []) =
-      singletonJust xs
-    singletonJust ((More (_,Just x) xs) :| []) =
-      all isNil $ NE.toList xs
-    singletonJust _ = False
-
-    isNil Nil = True
-    isNil _   = False
-
-    -- expects children to be singletons
-    justToRest ts (More (t,Just x) xs) =
-      Rest (NE.fromList $ t:ts) x
-    justToRest ts (More (t,Nothing) (x:|_)) =
-      justToRest (ts ++ [t]) x
+    removeNils xs = case removeNils' xs of
+                      [] -> [Nil]
+                      ys -> ys
+      where
+        removeNils' [] = []
+        removeNils' (Nil:xs) = removeNils' xs
+        removeNils' (x:xs) = x : removeNils' xs
