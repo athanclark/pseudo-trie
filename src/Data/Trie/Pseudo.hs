@@ -1,12 +1,13 @@
 {-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Data.Trie.Pseudo where
 
-import Control.Arrow (second)
 import           Control.Applicative
-import           Data.Foldable hiding (all)
-import Data.List (intercalate)
+import           Control.Arrow             (second)
+import           Data.Foldable             hiding (all)
+import           Data.List                 (intercalate)
 import           Data.List.NonEmpty        (NonEmpty (..), fromList, toList)
 import qualified Data.List.NonEmpty        as NE
 import           Data.Maybe                (fromMaybe)
@@ -25,25 +26,13 @@ data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Nil
   deriving (Show, Eq, Functor)
 
--- instance (Show t, Show a) => Show (PseudoTrie t a) where
---   show Nil = "Ø "
---   show (Rest ts a) = "R: " ++ intercalate " ~ " (NE.toList $ fmap show ts) ++ " (" ++ show a ++ ") "
---   show (More (t,Nothing) as) =
---     show t ++ " / (Nothing) {"
---       ++ (NE.toList as >>= (\y -> show y ++ " + "))
---       ++ "}\n"
---   show (More (t,Just a) as) =
---     show t ++ " (" ++ show a ++ ") / {"
---       ++ (NE.toList as >>= (\y -> show y ++ " + "))
---       ++ "}\n"
-
-instance (Arbitrary t, Arbitrary a) => Arbitrary (PseudoTrie t a) where
+instance (Arbitrary a) => Arbitrary (PseudoTrie String a) where
   arbitrary = do
-    (ts :: [t]) <- listOf1 arbitrary
+    (ts :: [String]) <- listOf1 $ (:[]) <$> (arbitrary :: Gen Char)
     (x :: a) <- arbitrary
-    (t :: t) <- arbitrary
+    (t :: String) <- (:[]) <$> arbitrary
     (mx :: Maybe a) <- arbitrary
-    (xs :: [PseudoTrie t a]) <- listOf1 arbitrary
+    (xs :: [PseudoTrie String a]) <- listOf1 arbitrary
     oneof [ return Nil
           , return $ Rest (fromList ts) x
           , return $ More (t,mx) $ fromList xs
@@ -232,6 +221,6 @@ prune = go
                       [] -> [Nil]
                       ys -> ys
       where
-        removeNils' [] = []
-        removeNils' (Nil:xs) = removeNils' xs
-        removeNils' (x:xs) = x : removeNils' xs
+        removeNils' []       =     []
+        removeNils' (Nil:xs) =     removeNils' xs
+        removeNils' (x:xs)   = x : removeNils' xs

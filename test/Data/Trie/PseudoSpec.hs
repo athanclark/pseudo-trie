@@ -24,7 +24,8 @@ main = hspec spec
 spec :: Spec
 spec = do
   describe "reconstruction" $ do
-    prop "`fromAssocs . toAssocs` should ~ `prune`" fromToPrune
+    prop "`fromAssocs . toAssocs` should homomorphically `prune`" fromToPrune
 
 fromToPrune :: PseudoTrie String Int -> Property
-fromToPrune trie = (fromAssocs $ toAssocs trie) === prune trie
+fromToPrune trie = (fromAssocs $ toAssocs $ prune trie)
+               === (prune $ fromAssocs $ toAssocs trie)

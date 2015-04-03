@@ -1,13 +1,14 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor       #-}
+{-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Data.Trie.Rooted where
 
 import           Control.Applicative
-import           Data.List.NonEmpty  hiding (head, tail)
-import qualified Data.List.NonEmpty  as NE
+import           Data.List.NonEmpty        hiding (head, tail)
+import qualified Data.List.NonEmpty        as NE
 import           Data.Monoid
-import Data.Trie.Pseudo as P
+import           Data.Trie.Pseudo          as P
 import           Test.QuickCheck
 import           Test.QuickCheck.Instances
 
@@ -15,10 +16,10 @@ import           Test.QuickCheck.Instances
 data Rooted t a = Rooted (Maybe a) [PseudoTrie t a]
   deriving (Show, Eq, Functor)
 
-instance (Arbitrary t, Arbitrary a) => Arbitrary (Rooted t a) where
+instance (Arbitrary a) => Arbitrary (Rooted String a) where
   arbitrary = do
     (mx :: Maybe a) <- arbitrary
-    (xs :: [PseudoTrie t a]) <- arbitrary
+    (xs :: [PseudoTrie String a]) <- arbitrary
     return $ Rooted mx xs
 
 -- | Intersection instance
