@@ -13,7 +13,8 @@ import           Test.QuickCheck
 import           Test.QuickCheck.Instances
 
 
-data Rooted t a = Rooted (Maybe a) [PseudoTrie t a]
+data Rooted t a = Rooted { root :: (Maybe a)
+                         , children :: [PseudoTrie t a] }
   deriving (Show, Eq, Functor)
 
 instance (Arbitrary a) => Arbitrary (Rooted String a) where
