@@ -34,6 +34,15 @@ instance (Eq t, Monoid a) => Monoid (Rooted t a) where
   mempty = Rooted Nothing []
   mappend = unionWith mappend
 
+newtype MergeRooted t a = MergeRooted
+  { unMergeRooted :: Rooted t a }
+  deriving (Functor)
+
+instance (Eq t) => Monoid (MergeRooted t a) where
+  mempty = MergeRooted $ Rooted Nothing []
+  (MergeRooted x) `mappend` (MergeRooted y) =
+    MergeRooted $ x `Data.Trie.Rooted.merge` y
+
 -- | Strictly constructive form of @Data.Trie.Pseudo.assign@
 assign :: (Eq t) => [t] -> Maybe a -> Rooted t a -> Rooted t a
 assign [] mx (Rooted _ ys) = Rooted mx ys
@@ -52,17 +61,6 @@ lookup ts (Rooted _ xs) = foldr (go ts) Nothing xs
   where
     go ts x Nothing     = P.lookup (NE.fromList ts) x
     go ts x ma@(Just a) = ma
-
-
--- ["a"] 0 Rooted (Just (-2))
-            --  [More ("",Just (-1))
-            --     (More ("g:",Just 0)
-            --       (Rest ("" :| ["W)"]) (-1)
-            --    :| [])
-            --  :| [More ("",Nothing) (Nil :| [])] )
-            --  ]
-
-
 
 merge :: (Eq t) =>
          Rooted t a

@@ -82,7 +82,7 @@ assign tss@(t:|ts) mx ys@(Rest pss@(p:|ps) y)
                (t':_,p':_) -> if t' == p'
                                 then More (t,Nothing) $
                                        assign (NE.fromList ts) mx (Rest (NE.fromList ps) y) :| []
-                                else case mx of
+                                else case mx of -- disjoint
                                        Nothing  -> ys
                                        Just x   -> More (t,Nothing) $ NE.fromList $
                                                      [ Rest (NE.fromList ps) y
