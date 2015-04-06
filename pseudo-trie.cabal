@@ -17,22 +17,6 @@ Library
                         Data.Trie.Rooted
   Build-Depends:        base >= 4 && < 5
                       , semigroups
-                      , QuickCheck
-                      , quickcheck-instances
-
-Test-Suite spec
-  Type:                 exitcode-stdio-1.0
-  Default-Language:     Haskell2010
-  Hs-Source-Dirs:       src
-                      , test
-  Ghc-Options:          -Wall
-  Main-Is:              Spec.hs
-  Build-Depends:        base
-                      , hspec
-                      , QuickCheck
-                      , quickcheck-instances
-                      , data-default
-                      , semigroups
 
 Source-Repository head
   Type:                 git

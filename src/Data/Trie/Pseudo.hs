@@ -16,8 +16,7 @@ import           Data.Monoid
 import qualified Data.Semigroup            as S
 import           Prelude                   hiding (foldl, foldr, foldr1, lookup,
                                             map)
-import           Test.QuickCheck
-import           Test.QuickCheck.Instances
+
 
 
 -- TODO: difference
@@ -26,23 +25,6 @@ data PseudoTrie t a = More (t, Maybe a) (NonEmpty (PseudoTrie t a))
                     | Rest (NonEmpty t) a
                     | Nil
   deriving (Show, Eq, Functor)
-
-instance (Arbitrary a) => Arbitrary (PseudoTrie String a) where
-  arbitrary = do
-    (ts :: [String]) <- do
-                          n <- choose (1,2)
-                          replicateM n $
-                            return <$> (arbitrary :: Gen Char)
-    (x :: a) <- arbitrary
-    (t :: String) <- return <$> arbitrary
-    (mx :: Maybe a) <- arbitrary
-    (xs :: [PseudoTrie String a]) <- do
-                                      n <- choose (1,3)
-                                      replicateM n arbitrary
-    oneof [ return Nil
-          , return $ Rest (fromList ts) x
-          , return $ More (t,mx) $ fromList xs
-          ]
 
 -- | Overwriting instance
 instance (Eq t) => Monoid (PseudoTrie t a) where
@@ -110,7 +92,7 @@ merge xx@(Rest tss@(t:|ts) x) (Rest pss@(p:|ps) y)
   | otherwise = xx
 merge xx@(More (t,mx) xs) (More (p,my) ys)
   | t == p = More (p,my) $ NE.fromList $
-              foldr go [] $ NE.toList xs ++ NE.toList ys
+               foldr go [] $ NE.toList xs ++ NE.toList ys
   | otherwise = xx
   where
     go q [] = [q]
@@ -128,6 +110,17 @@ merge xx@(Rest tss@(t:|ts) x) (More (p,my) ys)
                _  -> More (p,my) $
                        fmap (merge $ Rest (NE.fromList ts) x) ys
   | otherwise = xx
+
+add :: (Eq t) => NonEmpty t -> PseudoTrie t a -> PseudoTrie t a -> PseudoTrie t a
+add ts input container =
+  let ts' = NE.toList ts in
+  merge container $ mkMores ts' input
+  where
+    mkMores :: (Eq t) => [t] -> PseudoTrie t a -> PseudoTrie t a
+    mkMores [] trie = trie
+    mkMores (t:ts) trie = More (t,Nothing) $
+      mkMores ts trie :| []
+
 
 toAssocs :: PseudoTrie t a -> [(NonEmpty t, a)]
 toAssocs = go [] []

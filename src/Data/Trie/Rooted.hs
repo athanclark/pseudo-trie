@@ -9,19 +9,11 @@ import           Data.List.NonEmpty        hiding (head, tail)
 import qualified Data.List.NonEmpty        as NE
 import           Data.Monoid
 import           Data.Trie.Pseudo          as P
-import           Test.QuickCheck
-import           Test.QuickCheck.Instances
 
 
 data Rooted t a = Rooted { root :: (Maybe a)
                          , children :: [PseudoTrie t a] }
   deriving (Show, Eq, Functor)
-
-instance (Arbitrary a) => Arbitrary (Rooted String a) where
-  arbitrary = do
-    (mx :: Maybe a) <- arbitrary
-    (xs :: [PseudoTrie String a]) <- arbitrary
-    return $ Rooted mx xs
 
 -- | Intersection instance
 instance (Eq t) => Applicative (Rooted t) where
