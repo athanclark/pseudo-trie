@@ -111,6 +111,7 @@ merge xx@(Rest tss@(t:|ts) x) (More (p,my) ys)
                        fmap (merge $ Rest (NE.fromList ts) x) ys
   | otherwise = xx
 
+
 add :: (Eq t) => NonEmpty t -> PseudoTrie t a -> PseudoTrie t a -> PseudoTrie t a
 add ts input container =
   let ts' = NE.toList ts in
