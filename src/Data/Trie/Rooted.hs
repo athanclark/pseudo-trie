@@ -86,20 +86,20 @@ unionWith f (Rooted mx xs) (Rooted my ys) =
     unionWith' f (Rest tss@(t:|ts) x) (Rest pss@(p:|ps) y)
       | tss == pss = Rest pss $ f x y
       | t == p = case (ts,ps) of
-                   ([], p':ps') -> More (t, Just x) $ Rest (fromList ps) y :| []
-                   (t':ts', []) -> More (p, Just y) $ Rest (fromList ts) x :| []
-                   (_,_) -> More (t,Nothing) $ fromList
+                   ([], p':ps') -> More t (Just x) $ Rest (fromList ps) y :| []
+                   (t':ts', []) -> More p (Just y) $ Rest (fromList ts) x :| []
+                   (_,_) -> More t Nothing $ fromList
                               [unionWith' f (Rest (NE.fromList ts) x)
                                             (Rest (NE.fromList ps) y)]
-    unionWith' f (More (t,mx) xs) (More (p,my) ys)
+    unionWith' f (More t mx xs) (More p my ys)
       | t == p = let zs = NE.toList xs ++ NE.toList ys in
-                 More (p,f <$> mx <*> my) $ NE.fromList $
+                 More p (f <$> mx <*> my) $ NE.fromList $
                    foldr (\q (z':zs') -> unionWith' f z' q : zs') [head zs] (tail zs)
-    unionWith' f (More (t,mx) xs) (Rest pss@(p:|ps) y)
+    unionWith' f (More t mx xs) (Rest pss@(p:|ps) y)
       | t == p = case ps of
-                   [] -> More (p,f <$> mx <*> Just y) xs
-                   _  -> More (t,mx) $ fmap (flip (unionWith' f) $ Rest (fromList ps) y) xs
-    unionWith' f (Rest tss@(t:|ts) x) (More (p,my) ys)
+                   [] -> More p (f <$> mx <*> Just y) xs
+                   _  -> More t mx $ fmap (flip (unionWith' f) $ Rest (fromList ps) y) xs
+    unionWith' f (Rest tss@(t:|ts) x) (More p my ys)
       | t == p = case ts of
-                   [] -> More (t,f <$> Just x <*> my) ys
-                   _  -> More (p,my) $ fmap (unionWith' f $ Rest (fromList ts) x) ys
+                   [] -> More t (f <$> Just x <*> my) ys
+                   _  -> More p my $ fmap (unionWith' f $ Rest (fromList ts) x) ys
